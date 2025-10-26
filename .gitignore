@@ -1,0 +1,17 @@
+venv
+
+# Arquivos de vídeo
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wmv
+
+# Arquivos de áudio
+*.wav
+*.flac
+
+# Outros arquivos grandes
+*.zip
+*.rar
+*.iso
