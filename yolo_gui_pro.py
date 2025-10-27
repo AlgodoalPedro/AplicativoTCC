@@ -1,43 +1,4 @@
-# ================================================
-# Auto-verificação de dependências do requirements.txt
-# ================================================
-import os
 import sys
-import subprocess
-
-def instalar_dependencias():
-    """
-    Verifica e instala automaticamente as dependências do requirements.txt
-    caso alguma esteja faltando.
-    """
-    try:
-        import pkg_resources
-        requirements_path = os.path.join(os.path.dirname(__file__), "requirements.txt")
-
-        if os.path.exists(requirements_path):
-            with open(requirements_path, "r") as f:
-                dependencies = f.read().splitlines()
-
-            try:
-                pkg_resources.require(dependencies)
-            except pkg_resources.DistributionNotFound as e:
-                print(f"[INFO] Dependência ausente: {e}. Instalando todas as dependências...")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_path])
-            except pkg_resources.VersionConflict as e:
-                print(f"[INFO] Conflito de versão: {e}. Atualizando dependências...")
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "-r", requirements_path])
-    except Exception as err:
-        print(f"[AVISO] Erro ao verificar dependências: {err}")
-        print("Tentando instalar dependências manualmente...")
-        try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
-        except Exception as e:
-            print(f"[ERRO] Falha ao instalar dependências: {e}")
-            sys.exit(1)
-
-# Executa a verificação antes de importar as libs principais
-instalar_dependencias()
-
 import cv2
 from ultralytics import YOLO
 from PyQt5.QtWidgets import (
@@ -65,7 +26,14 @@ class YOLOThread(QThread):
             self.progress.emit(15)
             model = YOLO(self.model_path)
             self.progress.emit(45)
-            results = model(self.image_path)
+            # Inferência com parâmetros otimizados
+            results = model(
+                self.image_path,
+                verbose=False,
+                conf=0.5,
+                device='0',
+                half=True
+            )
             self.progress.emit(75)
 
             save_dir = "resultados"
@@ -93,7 +61,7 @@ class YOLOThread(QThread):
 # THREAD WEBCAM / VÍDEO
 # ======================
 class WebcamThread(QThread):
-    frame_updated = pyqtSignal(QImage, list)
+    frame_updated = pyqtSignal(QImage, list, float)  # Adicionado FPS
 
     def __init__(self, model_path, source=0):
         super().__init__()
@@ -102,13 +70,29 @@ class WebcamThread(QThread):
         self.source = source
 
     def run(self):
+        import time
         model = YOLO(self.model_path)
         cap = cv2.VideoCapture(self.source)
+
+        # Contador de FPS
+        fps_counter = 0
+        start_time = time.time()
+        fps = 0.0
+
         while self.running and cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
-            results = model(frame, verbose=False)
+
+            # Inferência com parâmetros otimizados
+            results = model(
+                frame,
+                verbose=False,
+                conf=0.5,
+                device='0',
+                half=True
+            )
+
             annotated = results[0].plot()
             rgb = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
             h, w, ch = rgb.shape
@@ -121,7 +105,13 @@ class WebcamThread(QThread):
                 nome = results[0].names[cls]
                 detections.append((nome, conf))
 
-            self.frame_updated.emit(qt_img, detections)
+            # Calcular FPS
+            fps_counter += 1
+            if fps_counter % 30 == 0:
+                fps = fps_counter / (time.time() - start_time)
+                print(f"FPS: {fps:.2f}")
+
+            self.frame_updated.emit(qt_img, detections, fps)
         cap.release()
 
     def stop(self):
@@ -137,7 +127,7 @@ class YOLOApp(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("YOLO Vision Studio")
-        self.setGeometry(100, 100, 1200, 720)
+        self.setGeometry(100, 100, 1600, 900)
         self.setWindowIcon(QIcon.fromTheme("camera"))
         self.model_path = None
         self.image_path = None
@@ -225,6 +215,12 @@ class YOLOApp(QWidget):
         self.image_label.setStyleSheet("background-color: #1a1a1a; border-radius: 10px;")
         content.addWidget(self.image_label)
 
+        # Label de FPS
+        self.fps_label = QLabel("FPS: --")
+        self.fps_label.setAlignment(Qt.AlignCenter)
+        self.fps_label.setStyleSheet("color: #00ffae; font-size: 14px; font-weight: bold; margin: 5px;")
+        content.addWidget(self.fps_label)
+
         self.progress = QProgressBar()
         self.progress.setStyleSheet("""
             QProgressBar {
@@ -295,9 +291,10 @@ class YOLOApp(QWidget):
             self.display_image(file_path)
             self.list.clear()
             self.progress.setValue(0)
+            self.fps_label.setText("FPS: --")
 
     def display_image(self, path):
-        pix = QPixmap(path).scaled(850, 500, Qt.KeepAspectRatio)
+        pix = QPixmap(path).scaled(1920, 1080, Qt.KeepAspectRatio)
         self.image_label.setPixmap(pix)
 
     def detect_image(self):
@@ -355,12 +352,15 @@ class YOLOApp(QWidget):
             self.webcam_thread.frame_updated.connect(self.update_frame)
             self.webcam_thread.start()
 
-    def update_frame(self, img, detections):
-        pix = QPixmap.fromImage(img).scaled(850, 500, Qt.KeepAspectRatio)
+    def update_frame(self, img, detections, fps):
+        pix = QPixmap.fromImage(img).scaled(1920, 1080, Qt.KeepAspectRatio)
         self.image_label.setPixmap(pix)
         self.list.clear()
         for nome, conf in detections:
             self.list.addItem(f"{nome} ({conf:.2f})")
+        # Atualizar FPS
+        if fps > 0:
+            self.fps_label.setText(f"FPS: {fps:.2f}")
 
 
 # ======================
