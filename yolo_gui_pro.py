@@ -123,8 +123,9 @@ class WebcamThread(QThread):
 class YOLOApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("YOLO Vision Studio")
+        self.setWindowTitle("FEI - Vision Studio")
         self.setGeometry(100, 100, 1400, 900)
+        self.setMinimumSize(1200, 700)  # Tamanho mínimo da janela
         self.model_path = None
         self.source_path = None
         self.webcam_thread = None
@@ -153,9 +154,9 @@ class YOLOApp(QWidget):
 
         # Logo e título
         logo_container = QHBoxLayout()
-        logo_label = QLabel("🧠")
+        logo_label = QLabel("👷")
         logo_label.setStyleSheet("font-size: 28px;")
-        title = QLabel("YOLO Vision Studio")
+        title = QLabel("FEI Vision Studio")
         title.setStyleSheet("""
             color: #111827;
             font-size: 18px;
@@ -462,27 +463,48 @@ class YOLOApp(QWidget):
         """)
 
     def setup_placeholder(self):
-        """Configura o placeholder visual"""
-        placeholder_layout = QVBoxLayout()
+        """Configura o placeholder visual sem cortar conteúdo"""
+        if self.image_label.layout():
+            QWidget().setLayout(self.image_label.layout())
+
+        placeholder_container = QFrame()
+        placeholder_container.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border: 1px solid #e5e7eb;
+                border-radius: 12px;
+            }
+        """)
+
+        placeholder_layout = QVBoxLayout(placeholder_container)
         placeholder_layout.setAlignment(Qt.AlignCenter)
-        
+        placeholder_layout.setSpacing(12)
+        placeholder_layout.setContentsMargins(10, 10, 10, 10)
+
         icon_placeholder = QLabel("🖼")
         icon_placeholder.setAlignment(Qt.AlignCenter)
-        icon_placeholder.setStyleSheet("font-size: 64px; margin-bottom: 10px;")
-        
+        icon_placeholder.setStyleSheet("font-size: 48px;")
+
         text_placeholder = QLabel("Nenhuma imagem carregada")
         text_placeholder.setAlignment(Qt.AlignCenter)
-        text_placeholder.setStyleSheet("color: #111827; font-size: 16px; font-weight: 600;")
-        
+        text_placeholder.setStyleSheet("color: #111827; font-size: 14px; font-weight: 600;")
+
         subtext_placeholder = QLabel("Selecione uma imagem, vídeo ou ative a webcam para começar")
         subtext_placeholder.setAlignment(Qt.AlignCenter)
-        subtext_placeholder.setStyleSheet("color: #6b7280; font-size: 13px; margin-top: 5px;")
-        
+        subtext_placeholder.setWordWrap(True)
+        subtext_placeholder.setStyleSheet("color: #6b7280; font-size: 12px;")
+        subtext_placeholder.setMaximumWidth(300)
+
         placeholder_layout.addWidget(icon_placeholder)
         placeholder_layout.addWidget(text_placeholder)
         placeholder_layout.addWidget(subtext_placeholder)
-        
-        self.image_label.setLayout(placeholder_layout)
+
+        main_placeholder_layout = QVBoxLayout()
+        main_placeholder_layout.setAlignment(Qt.AlignCenter)
+        main_placeholder_layout.addWidget(placeholder_container)
+
+        self.image_label.setLayout(main_placeholder_layout)
+
 
     def load_available_models(self):
         """Carrega modelos .pt disponíveis no diretório"""
@@ -641,26 +663,47 @@ class YOLOApp(QWidget):
         if self.image_label.layout():
             QWidget().setLayout(self.image_label.layout())
         
-        placeholder_layout = QVBoxLayout()
+        # Container principal com borda
+        placeholder_container = QFrame()
+        placeholder_container.setFixedSize(420, 320)
+        placeholder_container.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border: 1px solid #e5e7eb;
+                border-radius: 12px;
+                padding: 35px;
+            }
+        """)
+        
+        placeholder_layout = QVBoxLayout(placeholder_container)
         placeholder_layout.setAlignment(Qt.AlignCenter)
+        placeholder_layout.setSpacing(10)
+        placeholder_layout.setContentsMargins(25, 25, 25, 25)
         
         icon = QLabel("✓")
         icon.setAlignment(Qt.AlignCenter)
-        icon.setStyleSheet("font-size: 64px; color: #10b981; margin-bottom: 10px;")
+        icon.setStyleSheet("font-size: 52px; color: #10b981; background: transparent; border: none;")
         
         text = QLabel(main_text)
         text.setAlignment(Qt.AlignCenter)
-        text.setStyleSheet("color: #111827; font-size: 16px; font-weight: 600;")
+        text.setStyleSheet("color: #111827; font-size: 15px; font-weight: 600; background: transparent; border: none; margin-top: 10px;")
         
         subtext = QLabel(sub_text)
         subtext.setAlignment(Qt.AlignCenter)
-        subtext.setStyleSheet("color: #6b7280; font-size: 13px; margin-top: 5px;")
+        subtext.setStyleSheet("color: #6b7280; font-size: 12px; background: transparent; border: none; line-height: 1.4;")
+        subtext.setWordWrap(True)
+        subtext.setMaximumWidth(360)
         
         placeholder_layout.addWidget(icon)
         placeholder_layout.addWidget(text)
         placeholder_layout.addWidget(subtext)
         
-        self.image_label.setLayout(placeholder_layout)
+        # Layout para centralizar o container
+        main_placeholder_layout = QVBoxLayout()
+        main_placeholder_layout.setAlignment(Qt.AlignCenter)
+        main_placeholder_layout.addWidget(placeholder_container)
+        
+        self.image_label.setLayout(main_placeholder_layout)
 
     def toggle_detection(self):
         """Inicia ou para a detecção"""
