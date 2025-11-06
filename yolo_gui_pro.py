@@ -5,7 +5,7 @@ from ultralytics import YOLO
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QFileDialog, QMessageBox, QListWidget, QProgressBar, QFrame,
-    QComboBox, QButtonGroup, QRadioButton
+    QComboBox, QButtonGroup, QRadioButton, QSplitter, QSizePolicy
 )
 from PyQt5.QtGui import QPixmap, QImage, QFont, QIcon
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QDir
@@ -125,56 +125,63 @@ class YOLOApp(QWidget):
         super().__init__()
         self.setWindowTitle("FEI - Vision Studio")
         self.setGeometry(100, 100, 1400, 900)
-        self.setMinimumSize(1200, 700)  # Tamanho mínimo da janela
+        self.setMinimumSize(900, 600)  # Tamanho mínimo da janela - mais flexível
         self.model_path = None
         self.source_path = None
         self.webcam_thread = None
         self.thread = None
         self.is_detecting = False
         self.detection_mode = "image"  # image, video, camera
+        self.current_image_path = None  # Armazena o caminho da imagem atual
+        self.current_scale = 1.0  # Escala atual da interface
+        self.ui_initialized = False  # Flag para indicar se a UI está completamente inicializada
 
         # Layout geral
         main_layout = QHBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
+        # Splitter para tornar redimensionável
+        self.splitter = QSplitter(Qt.Horizontal)
+
         # === Barra lateral ===
-        sidebar = QFrame()
-        sidebar.setFixedWidth(280)
-        sidebar.setStyleSheet("""
+        self.sidebar = QFrame()
+        self.sidebar.setMinimumWidth(250)
+        self.sidebar.setMaximumWidth(400)
+        self.sidebar.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
                 border-right: 1px solid #e5e7eb;
             }
         """)
-        side_layout = QVBoxLayout(sidebar)
+        side_layout = QVBoxLayout(self.sidebar)
         side_layout.setContentsMargins(20, 30, 20, 20)
         side_layout.setSpacing(20)
         side_layout.setAlignment(Qt.AlignTop)
 
         # Logo e título
         logo_container = QHBoxLayout()
-        logo_label = QLabel("👷")
-        logo_label.setStyleSheet("font-size: 28px;")
-        title = QLabel("FEI Vision Studio")
-        title.setStyleSheet("""
+        self.logo_label = QLabel("👷")
+        self.logo_label.setStyleSheet("font-size: 28px;")
+        self.title_label = QLabel("FEI Vision Studio")
+        self.title_label.setStyleSheet("""
             color: #111827;
             font-size: 18px;
             font-weight: 600;
             margin-left: 8px;
         """)
-        logo_container.addWidget(logo_label)
-        logo_container.addWidget(title)
+        logo_container.addWidget(self.logo_label)
+        logo_container.addWidget(self.title_label)
         logo_container.addStretch()
         side_layout.addLayout(logo_container)
 
-        subtitle = QLabel("Detecção de Objetos")
-        subtitle.setStyleSheet("""
+        self.subtitle_label = QLabel("Detecção de Objetos")
+        self.subtitle_label.setStyleSheet("""
             color: #6b7280;
             font-size: 13px;
             margin-bottom: 5px;
         """)
-        side_layout.addWidget(subtitle)
+        side_layout.addWidget(self.subtitle_label)
 
         # Separador
         separator = QFrame()
@@ -183,15 +190,15 @@ class YOLOApp(QWidget):
         side_layout.addWidget(separator)
 
         # Seção Selecionar Modelo
-        model_label = QLabel("Modelo YOLO")
-        model_label.setStyleSheet("""
+        self.model_label = QLabel("Modelo YOLO")
+        self.model_label.setStyleSheet("""
             color: #374151;
             font-size: 12px;
             font-weight: 600;
             margin-top: 5px;
             margin-bottom: 8px;
         """)
-        side_layout.addWidget(model_label)
+        side_layout.addWidget(self.model_label)
 
         # ComboBox para modelos disponíveis
         self.model_combo = QComboBox()
@@ -239,15 +246,15 @@ class YOLOApp(QWidget):
         side_layout.addWidget(separator2)
 
         # Seção Tipo de Detecção
-        source_label = QLabel("Tipo de Detecção")
-        source_label.setStyleSheet("""
+        self.source_label = QLabel("Tipo de Detecção")
+        self.source_label.setStyleSheet("""
             color: #374151;
             font-size: 12px;
             font-weight: 600;
             margin-top: 5px;
             margin-bottom: 8px;
         """)
-        side_layout.addWidget(source_label)
+        side_layout.addWidget(self.source_label)
 
         # Radio buttons para escolher tipo
         self.source_group = QButtonGroup()
@@ -314,15 +321,15 @@ class YOLOApp(QWidget):
         side_layout.addWidget(separator3)
 
         # Botão carregar fonte
-        source_btn_label = QLabel("Carregar Fonte")
-        source_btn_label.setStyleSheet("""
+        self.source_btn_label = QLabel("Carregar Fonte")
+        self.source_btn_label.setStyleSheet("""
             color: #374151;
             font-size: 12px;
             font-weight: 600;
             margin-top: 5px;
             margin-bottom: 8px;
         """)
-        side_layout.addWidget(source_btn_label)
+        side_layout.addWidget(self.source_btn_label)
 
         self.btn_load_source = self.create_primary_button("📂  Selecionar Arquivo", "#3b82f6")
         self.btn_load_source.clicked.connect(self.load_source)
@@ -335,15 +342,15 @@ class YOLOApp(QWidget):
         side_layout.addWidget(separator4)
 
         # Botão Salvar
-        save_label = QLabel("Salvar Resultado")
-        save_label.setStyleSheet("""
+        self.save_label = QLabel("Salvar Resultado")
+        self.save_label.setStyleSheet("""
             color: #374151;
             font-size: 12px;
             font-weight: 600;
             margin-top: 5px;
             margin-bottom: 8px;
         """)
-        side_layout.addWidget(save_label)
+        side_layout.addWidget(self.save_label)
 
         self.btn_save = self.create_secondary_button("💾  Salvar")
         self.btn_save.clicked.connect(self.save_result)
@@ -357,11 +364,12 @@ class YOLOApp(QWidget):
         side_layout.addWidget(self.btn_detect)
 
         # === Área de conteúdo principal ===
-        content_frame = QFrame()
-        content_frame.setStyleSheet("background-color: #f9fafb;")
-        content = QVBoxLayout(content_frame)
-        content.setContentsMargins(30, 30, 30, 30)
-        content.setSpacing(20)
+        self.content_frame = QFrame()
+        self.content_frame.setStyleSheet("background-color: #f9fafb;")
+        self.content_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.content_layout = QVBoxLayout(self.content_frame)
+        self.content_layout.setContentsMargins(30, 30, 30, 30)
+        self.content_layout.setSpacing(20)
 
         # Área de exibição da imagem
         self.image_container = QFrame()
@@ -372,19 +380,22 @@ class YOLOApp(QWidget):
                 border-radius: 12px;
             }
         """)
+        self.image_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         image_layout = QVBoxLayout(self.image_container)
         image_layout.setContentsMargins(0, 0, 0, 0)
 
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setMinimumHeight(400)
+        self.image_label.setMinimumHeight(300)
+        self.image_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.image_label.setScaledContents(False)
         
         # Placeholder quando não há imagem
         self.setup_placeholder()
         
         image_layout.addWidget(self.image_label)
 
-        content.addWidget(self.image_container, stretch=1)
+        self.content_layout.addWidget(self.image_container, stretch=1)
 
         # Barra de progresso
         self.progress = QProgressBar()
@@ -401,7 +412,7 @@ class YOLOApp(QWidget):
                 border-radius: 3px;
             }
         """)
-        content.addWidget(self.progress)
+        self.content_layout.addWidget(self.progress)
 
         # === Painel de resultados ===
         result_container = QFrame()
@@ -416,13 +427,13 @@ class YOLOApp(QWidget):
         result_layout.setContentsMargins(20, 20, 20, 20)
         result_layout.setSpacing(12)
 
-        result_header = QLabel("Objetos Detectados")
-        result_header.setStyleSheet("""
+        self.result_header = QLabel("Objetos Detectados")
+        self.result_header.setStyleSheet("""
             font-weight: 600;
             color: #111827;
             font-size: 15px;
         """)
-        result_layout.addWidget(result_header)
+        result_layout.addWidget(self.result_header)
 
         self.list = QListWidget()
         self.list.setStyleSheet("""
@@ -450,10 +461,16 @@ class YOLOApp(QWidget):
         self.list.addItem("Nenhum objeto detectado ainda. Selecione uma fonte e clique em 'Iniciar Detecção'.")
         result_layout.addWidget(self.list)
 
-        content.addWidget(result_container)
+        self.content_layout.addWidget(result_container)
 
-        main_layout.addWidget(sidebar)
-        main_layout.addWidget(content_frame, stretch=1)
+        # Adicionar widgets ao splitter
+        self.splitter.addWidget(self.sidebar)
+        self.splitter.addWidget(self.content_frame)
+        self.splitter.setStretchFactor(0, 0)  # sidebar não se expande
+        self.splitter.setStretchFactor(1, 1)  # content_frame se expande
+        self.splitter.setSizes([280, 1120])  # Tamanho inicial
+
+        main_layout.addWidget(self.splitter)
 
         # Aplicar estilo global
         self.setStyleSheet("""
@@ -461,6 +478,293 @@ class YOLOApp(QWidget):
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             }
         """)
+
+        # Marca que a UI foi completamente inicializada
+        self.ui_initialized = True
+
+    def resizeEvent(self, event):
+        """Evento chamado quando a janela é redimensionada"""
+        super().resizeEvent(event)
+
+        # Só aplica responsividade se a UI estiver completamente inicializada
+        if not self.ui_initialized:
+            return
+
+        # Calcula a nova escala baseada no tamanho da janela
+        self._update_responsive_scale()
+        # Atualiza a imagem se houver uma carregada
+        if self.current_image_path and self.image_label.pixmap():
+            self._update_displayed_image()
+
+    def _update_responsive_scale(self):
+        """Calcula e aplica escala responsiva baseada no tamanho da janela"""
+        width = self.width()
+        height = self.height()
+
+        # Define breakpoints e escalas
+        # Base: 1400x900 (tamanho padrão) = escala 1.0
+        base_width = 1400
+        base_height = 900
+
+        # Calcula escala baseada na largura e altura
+        width_scale = width / base_width
+        height_scale = height / base_height
+
+        # Usa a menor escala para garantir que tudo caiba
+        new_scale = min(width_scale, height_scale)
+
+        # Limita a escala entre 0.7 e 1.3
+        new_scale = max(0.7, min(1.3, new_scale))
+
+        # Se a escala mudou significativamente, atualiza os componentes
+        if abs(new_scale - self.current_scale) > 0.05:
+            self.current_scale = new_scale
+            self._apply_responsive_styles()
+
+    def _apply_responsive_styles(self):
+        """Aplica estilos responsivos a todos os componentes"""
+        # Verifica se a UI está inicializada
+        if not self.ui_initialized:
+            return
+
+        scale = self.current_scale
+
+        # Ajusta tamanhos de fonte
+        logo_size = int(28 * scale)
+        title_size = int(18 * scale)
+        subtitle_size = int(13 * scale)
+        label_size = int(12 * scale)
+        button_size = int(13 * scale)
+        action_button_size = int(14 * scale)
+        result_header_size = int(15 * scale)
+
+        # Ajusta margens e paddings
+        sidebar_margin_h = int(20 * scale)
+        sidebar_margin_v = int(30 * scale)
+        content_margin = int(30 * scale)
+        spacing = int(20 * scale)
+
+        # Atualiza largura da sidebar
+        sidebar_min = int(250 * scale)
+        sidebar_max = int(400 * scale)
+        self.sidebar.setMinimumWidth(max(200, sidebar_min))
+        self.sidebar.setMaximumWidth(sidebar_max)
+
+        # Atualiza margens dos layouts
+        self.sidebar.layout().setContentsMargins(sidebar_margin_h, sidebar_margin_v, sidebar_margin_h, int(20 * scale))
+        self.sidebar.layout().setSpacing(int(20 * scale))
+        self.content_layout.setContentsMargins(content_margin, content_margin, content_margin, content_margin)
+        self.content_layout.setSpacing(spacing)
+
+        # Atualiza logo
+        self.logo_label.setStyleSheet(f"font-size: {logo_size}px;")
+
+        # Atualiza título
+        self.title_label.setStyleSheet(f"""
+            color: #111827;
+            font-size: {title_size}px;
+            font-weight: 600;
+            margin-left: 8px;
+        """)
+
+        # Atualiza subtitle
+        self.subtitle_label.setStyleSheet(f"""
+            color: #6b7280;
+            font-size: {subtitle_size}px;
+            margin-bottom: 5px;
+        """)
+
+        # Atualiza labels de seção
+        label_style = f"""
+            color: #374151;
+            font-size: {label_size}px;
+            font-weight: 600;
+            margin-top: 5px;
+            margin-bottom: 8px;
+        """
+        self.model_label.setStyleSheet(label_style)
+        self.source_label.setStyleSheet(label_style)
+        self.source_btn_label.setStyleSheet(label_style)
+        self.save_label.setStyleSheet(label_style)
+
+        # Atualiza header de resultados
+        self.result_header.setStyleSheet(f"""
+            font-weight: 600;
+            color: #111827;
+            font-size: {result_header_size}px;
+        """)
+
+        # Atualiza ComboBox
+        combo_padding = int(10 * scale)
+        self.model_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: #f9fafb;
+                border: 1px solid #d1d5db;
+                border-radius: {int(8 * scale)}px;
+                padding: {combo_padding}px {int(12 * scale)}px;
+                color: #111827;
+                font-size: {button_size}px;
+            }}
+            QComboBox:hover {{
+                border-color: #3b82f6;
+                background-color: #ffffff;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+                width: {int(25 * scale)}px;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid #6b7280;
+                margin-right: 8px;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: #ffffff;
+                border: 1px solid #d1d5db;
+                border-radius: 6px;
+                selection-background-color: #dbeafe;
+                selection-color: #1e40af;
+                padding: 4px;
+            }}
+        """)
+
+        # Atualiza radio buttons
+        radio_style = f"""
+            QRadioButton {{
+                color: #374151;
+                font-size: {button_size}px;
+                padding: {int(8 * scale)}px;
+                spacing: {int(8 * scale)}px;
+            }}
+            QRadioButton::indicator {{
+                width: {int(18 * scale)}px;
+                height: {int(18 * scale)}px;
+                border-radius: {int(9 * scale)}px;
+                border: 2px solid #d1d5db;
+                background-color: #ffffff;
+            }}
+            QRadioButton::indicator:hover {{
+                border-color: #3b82f6;
+            }}
+            QRadioButton::indicator:checked {{
+                border-color: #3b82f6;
+                background-color: #3b82f6;
+            }}
+            QRadioButton::indicator:checked:after {{
+                content: '';
+                width: {int(8 * scale)}px;
+                height: {int(8 * scale)}px;
+                border-radius: {int(4 * scale)}px;
+                background-color: white;
+            }}
+        """
+        self.radio_image.setStyleSheet(radio_style)
+        self.radio_video.setStyleSheet(radio_style)
+        self.radio_camera.setStyleSheet(radio_style)
+
+        # Atualiza botões
+        btn_padding_v = int(11 * scale)
+        btn_padding_h = int(16 * scale)
+
+        self.btn_load_source.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #3b82f6;
+                border: none;
+                border-radius: {int(8 * scale)}px;
+                color: white;
+                font-weight: 500;
+                font-size: {button_size}px;
+                padding: {btn_padding_v}px {btn_padding_h}px;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background-color: #2563eb;
+            }}
+            QPushButton:pressed {{
+                background-color: #1d4ed8;
+            }}
+        """)
+
+        self.btn_save.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #f3f4f6;
+                border: 1px solid #d1d5db;
+                border-radius: {int(8 * scale)}px;
+                color: #374151;
+                font-weight: 500;
+                font-size: {button_size}px;
+                padding: {btn_padding_v}px {btn_padding_h}px;
+                text-align: left;
+            }}
+            QPushButton:hover {{
+                background-color: #e5e7eb;
+                border-color: #9ca3af;
+            }}
+            QPushButton:pressed {{
+                background-color: #d1d5db;
+            }}
+        """)
+
+        # Atualiza botão de detecção
+        action_padding_v = int(14 * scale)
+        action_padding_h = int(16 * scale)
+
+        if self.is_detecting:
+            bg_color = "#ef4444"
+            hover_color = "#dc2626"
+            pressed_color = "#b91c1c"
+        else:
+            bg_color = "#10b981"
+            hover_color = "#059669"
+            pressed_color = "#047857"
+
+        self.btn_detect.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {bg_color};
+                border: none;
+                border-radius: {int(10 * scale)}px;
+                color: white;
+                font-weight: 600;
+                font-size: {action_button_size}px;
+                padding: {action_padding_v}px {action_padding_h}px;
+                text-align: center;
+            }}
+            QPushButton:hover {{
+                background-color: {hover_color};
+            }}
+            QPushButton:pressed {{
+                background-color: {pressed_color};
+            }}
+        """)
+
+        # Atualiza lista de detecções
+        self.list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: #f9fafb;
+                border: 1px solid #e5e7eb;
+                border-radius: {int(8 * scale)}px;
+                color: #374151;
+                padding: {int(8 * scale)}px;
+                font-size: {button_size}px;
+            }}
+            QListWidget::item {{
+                padding: {int(8 * scale)}px;
+                border-radius: {int(6 * scale)}px;
+                margin: {int(2 * scale)}px 0px;
+            }}
+            QListWidget::item:hover {{
+                background-color: #eff6ff;
+            }}
+            QListWidget::item:selected {{
+                background-color: #dbeafe;
+                color: #1e40af;
+            }}
+        """)
+
+        # Atualiza altura mínima da imagem
+        self.image_label.setMinimumHeight(int(300 * scale))
 
     def setup_placeholder(self):
         """Configura o placeholder visual sem cortar conteúdo"""
@@ -644,12 +948,12 @@ class YOLOApp(QWidget):
                 self.progress.setValue(0)
 
     def display_image(self, path):
-        """Exibe uma imagem"""
+        """Exibe uma imagem redimensionando dinamicamente"""
         if self.image_label.layout():
             QWidget().setLayout(self.image_label.layout())
-        
-        pix = QPixmap(path).scaled(1200, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        self.image_label.setPixmap(pix)
+
+        self.current_image_path = path
+        self._update_displayed_image()
         self.image_container.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
@@ -658,14 +962,38 @@ class YOLOApp(QWidget):
             }
         """)
 
+    def _update_displayed_image(self):
+        """Atualiza a exibição da imagem com base no tamanho disponível"""
+        if not self.current_image_path:
+            return
+
+        # Calcula o tamanho disponível
+        available_width = self.image_label.width() - 40
+        available_height = self.image_label.height() - 40
+
+        if available_width <= 0 or available_height <= 0:
+            available_width = 800
+            available_height = 600
+
+        pix = QPixmap(self.current_image_path).scaled(
+            available_width,
+            available_height,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+        self.image_label.setPixmap(pix)
+
     def display_placeholder_with_text(self, main_text, sub_text):
         """Exibe placeholder com texto customizado"""
         if self.image_label.layout():
             QWidget().setLayout(self.image_label.layout())
-        
-        # Container principal com borda
+
+        self.current_image_path = None  # Limpa o caminho da imagem
+
+        # Container principal com borda (tamanho flexível)
         placeholder_container = QFrame()
-        placeholder_container.setFixedSize(420, 320)
+        placeholder_container.setMinimumSize(300, 250)
+        placeholder_container.setMaximumSize(500, 400)
         placeholder_container.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
@@ -726,24 +1054,7 @@ class YOLOApp(QWidget):
         """Inicia a detecção"""
         self.is_detecting = True
         self.btn_detect.setText("⏸  Parar Detecção")
-        self.btn_detect.setStyleSheet("""
-            QPushButton {
-                background-color: #ef4444;
-                border: none;
-                border-radius: 10px;
-                color: white;
-                font-weight: 600;
-                font-size: 14px;
-                padding: 14px 16px;
-                text-align: center;
-            }
-            QPushButton:hover {
-                background-color: #dc2626;
-            }
-            QPushButton:pressed {
-                background-color: #b91c1c;
-            }
-        """)
+        self._apply_responsive_styles()  # Reaplica estilos com a nova cor
 
         if self.detection_mode == "image":
             self.detect_image()
@@ -755,27 +1066,10 @@ class YOLOApp(QWidget):
         if self.webcam_thread and self.webcam_thread.isRunning():
             self.webcam_thread.stop()
             self.webcam_thread = None
-        
+
         self.is_detecting = False
         self.btn_detect.setText("▶  Iniciar Detecção")
-        self.btn_detect.setStyleSheet("""
-            QPushButton {
-                background-color: #10b981;
-                border: none;
-                border-radius: 10px;
-                color: white;
-                font-weight: 600;
-                font-size: 14px;
-                padding: 14px 16px;
-                text-align: center;
-            }
-            QPushButton:hover {
-                background-color: #059669;
-            }
-            QPushButton:pressed {
-                background-color: #047857;
-            }
-        """)
+        self._apply_responsive_styles()  # Reaplica estilos com a nova cor
 
     def detect_image(self):
         """Detecta objetos em imagem"""
@@ -794,7 +1088,7 @@ class YOLOApp(QWidget):
         """Mostra resultado da detecção em imagem"""
         self.is_detecting = False
         self.btn_detect.setText("▶  Iniciar Detecção")
-        self.btn_detect.setStyleSheet(self.create_action_button("", "#10b981").styleSheet())
+        self._apply_responsive_styles()  # Reaplica estilos com a nova cor
         
         if not output_path:
             QMessageBox.critical(self, "Erro", "Erro na inferência.")
@@ -824,11 +1118,24 @@ class YOLOApp(QWidget):
         """Atualiza frame do vídeo/câmera"""
         if self.image_label.layout():
             QWidget().setLayout(self.image_label.layout())
-            
-        pix = QPixmap.fromImage(img).scaled(1200, 800, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+        # Calcula o tamanho disponível
+        available_width = self.image_label.width() - 40
+        available_height = self.image_label.height() - 40
+
+        if available_width <= 0 or available_height <= 0:
+            available_width = 800
+            available_height = 600
+
+        pix = QPixmap.fromImage(img).scaled(
+            available_width,
+            available_height,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
         self.image_label.setPixmap(pix)
         self.list.clear()
-        
+
         if not detections:
             self.list.addItem("Nenhum objeto detectado no frame.")
         else:
