@@ -1,5 +1,5 @@
 """
-Thread para processamento YOLO em vídeo/webcam
+Thread para processamento YOLO em vídeo
 """
 import time
 import cv2
@@ -9,8 +9,8 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from PyQt5.QtGui import QImage
 
 
-class WebcamThread(QThread):
-    """Thread para processar detecção YOLO em tempo real (webcam/vídeo)"""
+class VideoThread(QThread):
+    """Thread para processar detecção YOLO em tempo real em vídeos"""
     frame_updated = pyqtSignal(QImage, list, float)
 
     def __init__(self, model_path, source=0, max_size=1280):

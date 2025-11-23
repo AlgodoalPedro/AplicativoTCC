@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt
 
-from ..threads import YOLOThread, WebcamThread
+from ..threads import YOLOThread, VideoThread
 from ..utils.image_utils import display_image_scaled, create_placeholder, create_custom_placeholder
 from . import styles
 
@@ -27,7 +27,7 @@ class YOLOApp(QWidget):
         # Atributos de estado
         self.model_path = None
         self.source_path = None
-        self.webcam_thread = None
+        self.video_thread = None
         self.thread = None
         self.is_detecting = False
         self.detection_mode = "image"
@@ -167,18 +167,11 @@ class YOLOApp(QWidget):
         self.radio_video.setStyleSheet(styles.get_radio_button_style())
         self.radio_video.toggled.connect(lambda: self._set_detection_mode("video"))
 
-        self.radio_camera = QRadioButton("📹  Vídeo IRL ou Câmera")
-        self.radio_camera.setCursor(Qt.PointingHandCursor)
-        self.radio_camera.setStyleSheet(styles.get_radio_button_style())
-        self.radio_camera.toggled.connect(lambda: self._set_detection_mode("camera"))
-
         self.source_group.addButton(self.radio_image)
         self.source_group.addButton(self.radio_video)
-        self.source_group.addButton(self.radio_camera)
 
         layout.addWidget(self.radio_image)
         layout.addWidget(self.radio_video)
-        layout.addWidget(self.radio_camera)
 
     def _add_load_source_section(self, layout):
         """Adiciona seção de carregar fonte"""
@@ -325,19 +318,14 @@ class YOLOApp(QWidget):
     def _set_detection_mode(self, mode):
         """Define o modo de detecção"""
         self.detection_mode = mode
-        if mode == "camera":
-            self.btn_load_source.setText("📹  Ativar Câmera")
-        elif mode == "video":
+        if mode == "video":
             self.btn_load_source.setText("🎬  Selecionar Vídeo")
         else:
             self.btn_load_source.setText("📷  Selecionar Imagem")
 
     def _load_source(self):
-        """Carrega a fonte (imagem, vídeo ou câmera)"""
-        if self.detection_mode == "camera":
-            self.source_path = 0
-            QMessageBox.information(self, "Câmera", "Câmera selecionada. Clique em 'Iniciar Detecção' para começar.")
-        elif self.detection_mode == "video":
+        """Carrega a fonte (imagem ou vídeo)"""
+        if self.detection_mode == "video":
             file_path, _ = QFileDialog.getOpenFileName(
                 self, "Selecionar Vídeo", "", "Vídeos (*.mp4 *.avi *.mov *.mkv)"
             )
@@ -387,7 +375,7 @@ class YOLOApp(QWidget):
             return
 
         if not self.source_path:
-            QMessageBox.warning(self, "Aviso", "Carregue uma fonte primeiro (imagem, vídeo ou câmera).")
+            QMessageBox.warning(self, "Aviso", "Carregue uma fonte primeiro (imagem ou vídeo).")
             return
 
         if self.is_detecting:
@@ -409,21 +397,21 @@ class YOLOApp(QWidget):
     def _stop_detection(self):
         """Para a detecção"""
         try:
-            if self.webcam_thread:
+            if self.video_thread:
                 print("Parando thread de vídeo...")
                 # Desconectar sinais para evitar problemas
                 try:
-                    self.webcam_thread.frame_updated.disconnect()
+                    self.video_thread.frame_updated.disconnect()
                 except:
                     pass
 
                 # Parar thread se estiver rodando
-                if self.webcam_thread.isRunning():
-                    self.webcam_thread.stop()
+                if self.video_thread.isRunning():
+                    self.video_thread.stop()
 
                 # Garantir que thread foi parada
-                self.webcam_thread.deleteLater()
-                self.webcam_thread = None
+                self.video_thread.deleteLater()
+                self.video_thread = None
                 print("Thread de vídeo parada com sucesso")
         except Exception as e:
             print(f"Erro ao parar thread de vídeo: {e}")
@@ -442,24 +430,24 @@ class YOLOApp(QWidget):
         self.thread.start()
 
     def _detect_video(self):
-        """Detecta objetos em vídeo ou câmera"""
+        """Detecta objetos em vídeo"""
         # Parar thread anterior se existir
-        if self.webcam_thread:
+        if self.video_thread:
             print("Limpando thread anterior...")
             try:
-                self.webcam_thread.frame_updated.disconnect()
+                self.video_thread.frame_updated.disconnect()
             except:
                 pass
-            if self.webcam_thread.isRunning():
-                self.webcam_thread.stop()
-            self.webcam_thread.deleteLater()
-            self.webcam_thread = None
+            if self.video_thread.isRunning():
+                self.video_thread.stop()
+            self.video_thread.deleteLater()
+            self.video_thread = None
 
         # Criar e iniciar nova thread
         print(f"Iniciando detecção de vídeo: {self.source_path}")
-        self.webcam_thread = WebcamThread(self.model_path, self.source_path, max_size=1280)
-        self.webcam_thread.frame_updated.connect(self._update_frame)
-        self.webcam_thread.start()
+        self.video_thread = VideoThread(self.model_path, self.source_path, max_size=1280)
+        self.video_thread.frame_updated.connect(self._update_frame)
+        self.video_thread.start()
 
     def _show_result(self, output_path, detections):
         """Mostra resultado da detecção em imagem"""
@@ -493,7 +481,7 @@ class YOLOApp(QWidget):
             QMessageBox.information(self, "Salvo", f"Imagem salva em:\n{file}")
 
     def _update_frame(self, img, detections, fps):
-        """Atualiza frame do vídeo/câmera"""
+        """Atualiza frame do vídeo"""
         from PyQt5.QtWidgets import QWidget
         if self.image_label.layout():
             QWidget().setLayout(self.image_label.layout())
@@ -524,9 +512,9 @@ class YOLOApp(QWidget):
         """Evento de fechamento da janela - limpar threads"""
         try:
             # Parar thread de vídeo se estiver rodando
-            if self.webcam_thread and self.webcam_thread.isRunning():
+            if self.video_thread and self.video_thread.isRunning():
                 print("Parando thread de vídeo...")
-                self.webcam_thread.stop()
+                self.video_thread.stop()
 
             # Parar thread de imagem se estiver rodando
             if self.thread and self.thread.isRunning():

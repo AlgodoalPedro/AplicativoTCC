@@ -17,7 +17,7 @@ Aplicativo de detecção de objetos usando YOLO com interface gráfica PyQt5 e a
 
 - **Detecção de objetos** usando modelos YOLO v8
 - **Aceleração por GPU** (NVIDIA CUDA 12.4)
-- **Suporte a múltiplas fontes**: imagens, vídeos e webcam
+- **Suporte a múltiplas fontes**: imagens e vídeos
 - **Interface moderna** com PyQt5
 - **Processamento otimizado** com FP16 para GPUs
 - **Redimensionamento automático** de vídeos grandes
@@ -33,7 +33,7 @@ AplicativoTCC/
 │   ├── threads/                  # Threads de processamento
 │   │   ├── __init__.py
 │   │   ├── yolo_thread.py       # Thread para imagens
-│   │   └── webcam_thread.py     # Thread para vídeo/câmera
+│   │   └── video_thread.py      # Thread para vídeo
 │   ├── ui/                       # Interface gráfica
 │   │   ├── __init__.py
 │   │   ├── main_window.py       # Janela principal
@@ -161,10 +161,6 @@ cmd.exe /c "venv\Scripts\python.exe main.py"
 - Formatos: MP4, AVI, MOV, MKV
 - Redimensionamento automático para 1280px (vídeos grandes)
 - Exibição de FPS em tempo real
-
-**Modo Câmera:**
-- Detecção em tempo real via webcam
-- Suporte a múltiplas câmeras
 - Controles de iniciar/parar
 
 #### 3. Visualização
@@ -229,8 +225,8 @@ cmd.exe /c "venv\Scripts\python.exe main.py"
   - Salva resultado anotado
   - Emite detecções via signal
 
-- **webcam_thread.py**: Processa detecção em tempo real
-  - Suporta webcam e vídeos
+- **video_thread.py**: Processa detecção em vídeo
+  - Suporta arquivos de vídeo
   - Redimensionamento automático
   - Gerenciamento de memória GPU
   - Cálculo de FPS

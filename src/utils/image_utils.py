@@ -36,7 +36,7 @@ def display_image_scaled(image_label, image_path):
 
 
 def create_placeholder(icon="🖼", main_text="Nenhuma imagem carregada",
-                      sub_text="Selecione uma imagem, vídeo ou ative a webcam para começar"):
+                      sub_text="Selecione uma imagem ou vídeo para começar"):
     """
     Cria um widget de placeholder para exibição quando não há imagem
 
@@ -100,21 +100,19 @@ def create_custom_placeholder(icon, main_text, sub_text):
         QVBoxLayout: Layout do placeholder
     """
     placeholder_container = QFrame()
-    placeholder_container.setMinimumSize(300, 250)
-    placeholder_container.setMaximumSize(500, 400)
     placeholder_container.setStyleSheet("""
         QFrame {
             background-color: #ffffff;
             border: 1px solid #e5e7eb;
             border-radius: 12px;
-            padding: 35px;
+            padding: 40px;
         }
     """)
 
     placeholder_layout = QVBoxLayout(placeholder_container)
     placeholder_layout.setAlignment(Qt.AlignCenter)
-    placeholder_layout.setSpacing(10)
-    placeholder_layout.setContentsMargins(25, 25, 25, 25)
+    placeholder_layout.setSpacing(15)
+    placeholder_layout.setContentsMargins(40, 40, 40, 40)
 
     icon_label = QLabel(icon)
     icon_label.setAlignment(Qt.AlignCenter)
@@ -122,13 +120,12 @@ def create_custom_placeholder(icon, main_text, sub_text):
 
     text = QLabel(main_text)
     text.setAlignment(Qt.AlignCenter)
-    text.setStyleSheet("color: #111827; font-size: 15px; font-weight: 600; background: transparent; border: none; margin-top: 10px;")
+    text.setStyleSheet("color: #111827; font-size: 16px; font-weight: 600; background: transparent; border: none; margin-top: 10px;")
 
     subtext = QLabel(sub_text)
     subtext.setAlignment(Qt.AlignCenter)
-    subtext.setStyleSheet("color: #6b7280; font-size: 12px; background: transparent; border: none; line-height: 1.4;")
+    subtext.setStyleSheet("color: #6b7280; font-size: 13px; background: transparent; border: none; line-height: 1.5;")
     subtext.setWordWrap(True)
-    subtext.setMaximumWidth(360)
 
     placeholder_layout.addWidget(icon_label)
     placeholder_layout.addWidget(text)
@@ -136,6 +133,7 @@ def create_custom_placeholder(icon, main_text, sub_text):
 
     main_placeholder_layout = QVBoxLayout()
     main_placeholder_layout.setAlignment(Qt.AlignCenter)
+    main_placeholder_layout.setContentsMargins(20, 20, 20, 20)
     main_placeholder_layout.addWidget(placeholder_container)
 
     return main_placeholder_layout
