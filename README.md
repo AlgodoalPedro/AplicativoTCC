@@ -1,4 +1,4 @@
-# FEI Vision Studio
+# Aplicativo TCC
 
 Aplicativo de detecção de objetos usando YOLO com interface gráfica PyQt5 e aceleração GPU.
 
