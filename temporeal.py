@@ -21,8 +21,7 @@ while cap.isOpened():
         frame,
         verbose=False,
         conf=0.5,
-        device='0',
-        half=True
+        device='cpu'
     )
     
     annotated_frame = results[0].plot()

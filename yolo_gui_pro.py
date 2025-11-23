@@ -32,8 +32,7 @@ class YOLOThread(QThread):
                 self.image_path,
                 verbose=False,
                 conf=0.5,
-                device='0',
-                half=True
+                device='cpu'
             )
             self.progress.emit(75)
 
@@ -88,8 +87,7 @@ class WebcamThread(QThread):
                 frame,
                 verbose=False,
                 conf=0.5,
-                device='0',
-                half=True
+                device='cpu'
             )
 
             annotated = results[0].plot()
